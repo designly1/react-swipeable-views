@@ -1,16 +1,5 @@
-// This is an alternative version that use `Animated.View`.
-// I'm not sure what version give the best UX experience.
-// I'm keeping the two versions here until we figured out.
-
 import * as React from 'react';
-import {
-  Animated,
-  Dimensions,
-  PanResponder,
-  StyleSheet,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { Animated, Dimensions, PanResponder, StyleSheet, View, ViewStyle } from 'react-native';
 import {
   constant,
   checkIndexBounds,
@@ -37,7 +26,6 @@ function getAnimatedValue(animated) {
   return animated._value; // eslint-disable-line no-underscore-dangle
 }
 
-
 interface Props {
   /**
    * If `true`, the height of the container will be animated to match the current slide height.
@@ -56,7 +44,7 @@ interface Props {
    * This is the inlined style that will be applied
    * to each slide container.
    */
-  containerStyle?: ViewStyle,
+  containerStyle?: ViewStyle;
   /**
    * If `true`, it will disable touch events.
    * This is useful when you want to prohibit the user from changing slides.
@@ -72,13 +60,13 @@ interface Props {
    * This is useful when you want to change the default slide shown.
    * Or when you have tabs linked to each slide.
    */
-  index?: number,
+  index?: number;
   /**
    * This is callback prop. It's call by the
    * component when the shown slide change after a swipe made by the user.
    * This is useful when you have tabs linked to each slide.
    */
-  onChangeIndex?: (index: number, fromIndex: number) => void,
+  onChangeIndex?: (index: number, fromIndex: number) => void;
   /**
    * This is callback prop. It's called by the
    * component when the slide switching.
@@ -89,16 +77,16 @@ interface Props {
   /**
    * @ignore
    */
-  onTouchEnd?: (event: any, gestureState: any) => void,
+  onTouchEnd?: (event: any, gestureState: any) => void;
   /**
    * @ignore
    */
-  onTouchStart?: (event: any, gestureState: any) => void,
+  onTouchStart?: (event: any, gestureState: any) => void;
   /**
    * The callback that fires when the animation comes to a rest.
    * This is useful to defer CPU intensive task.
    */
-  onTransitionEnd?: () => void,
+  onTransitionEnd?: () => void;
   /**
    * If `true`, it will add bounds effect on the edges.
    */
@@ -107,14 +95,14 @@ interface Props {
    * This is the inlined style that will be applied
    * on the slide component.
    */
-  slideStyle?: ViewStyle,
+  slideStyle?: ViewStyle;
   /**
    * This is the config given to Animated for the spring.
    * This is useful to change the dynamic of the transition.
    */
   springConfig?: {
-    friction: number;
-    tension: number;
+    friction: number,
+    tension: number,
   };
   /**
    * This is the inlined style that will be applied
@@ -126,7 +114,7 @@ interface Props {
    * If the computed speed is above this value, the index change.
    */
   threshold?: number;
-};
+}
 
 interface State {
   indexCurrent: Animated.Value;
@@ -135,7 +123,6 @@ interface State {
 }
 
 class SwipeableViews extends React.Component<Props, State> {
-
   static defaultProps = {
     animateTransitions: true,
     disabled: false,
@@ -150,25 +137,39 @@ class SwipeableViews extends React.Component<Props, State> {
   };
 
   panResponder: any = undefined;
-
   startX = 0;
-
   startIndex = 0;
 
-  // eslint-disable-next-line camelcase,react/sort-comp
-  UNSAFE_componentWillMount() {
+  constructor(props: Props) {
+    super(props);
+    
     if (process.env.NODE_ENV !== 'production') {
       checkIndexBounds(this.props);
     }
 
     const { index = 0 } = this.props;
 
-    this.setState({
+    this.state = {
       indexLatest: index,
       indexCurrent: new Animated.Value(index),
       viewLength: Dimensions.get('window').width,
-    });
+    };
 
+    this.initializePanResponder();
+    
+    this.warnAboutUnsupportedProps();
+  }
+
+  warnAboutUnsupportedProps() {
+    if (this.props.animateHeight !== undefined) {
+      console.warn('react-swipeable-view-native: The animateHeight property is not implement yet.');
+    }
+    if (this.props.axis !== undefined) {
+      console.warn('react-swipeable-view-native: The axis property is not implement yet.');
+    }
+  }
+
+  initializePanResponder() {
     this.panResponder = PanResponder.create({
       // So it's working inside a Modal
       onStartShouldSetPanResponder: () => true,
@@ -184,41 +185,47 @@ class SwipeableViews extends React.Component<Props, State> {
       onPanResponderMove: this.handleTouchMove,
       onPanResponderGrant: this.handleTouchStart,
     });
-
-    if (this.props.animateHeight !== undefined){
-      console.warn('react-swipeable-view-native: The animateHeight property is not implement yet.')
-    }
-    if (this.props.axis !== undefined) {
-      console.warn('react-swipeable-view-native: The axis property is not implement yet.')
-    }
   }
 
-  // eslint-disable-next-line camelcase,react/sort-comp
-  UNSAFE_componentWillReceiveProps(nextProps) {
+  // Replacement for UNSAFE_componentWillReceiveProps
+  static getDerivedStateFromProps(nextProps: Props, prevState: State) {
     const { index, animateTransitions } = nextProps;
 
-    if (typeof index === 'number' && index !== this.props.index) {
+    if (typeof index === 'number' && index !== prevState.indexLatest) {
       if (process.env.NODE_ENV !== 'production') {
         checkIndexBounds(nextProps);
       }
 
-      // If true, we are going to change the children. We shoudn't animate it.
-      const displaySameSlide = getDisplaySameSlide(this.props, nextProps);
-
-      if (animateTransitions && !displaySameSlide) {
-        this.setState(
-          {
-            indexLatest: index,
-          },
-          () => {
-            this.animateIndexCurrent(index);
-          },
-        );
-      } else {
-        this.setState({
+      // If we're not animating or if the children are the same,
+      // we update the state directly
+      if (!animateTransitions) {
+        return {
           indexLatest: index,
           indexCurrent: new Animated.Value(index),
-        });
+        };
+      }
+
+      // Otherwise, we only update indexLatest, and the animation
+      // will be handled in componentDidUpdate
+      return {
+        indexLatest: index,
+      };
+    }
+
+    return null;
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    // Handle animated transitions when index changes
+    if (typeof this.props.index === 'number' && 
+        this.props.index !== prevProps.index && 
+        this.props.animateTransitions) {
+      
+      // Check if we're displaying the same slide (for virtual scrolling)
+      const displaySameSlide = getDisplaySameSlide(prevProps, this.props);
+      
+      if (!displaySameSlide) {
+        this.animateIndexCurrent(this.props.index as number);
       }
     }
   }
@@ -341,6 +348,7 @@ class SwipeableViews extends React.Component<Props, State> {
       Animated.spring(this.state.indexCurrent, {
         toValue: index,
         ...this.props.springConfig,
+        useNativeDriver: false, // Add this for newer React Native versions
       }).start(this.handleAnimationFinished);
     } else {
       this.handleAnimationFinished({
@@ -370,7 +378,9 @@ class SwipeableViews extends React.Component<Props, State> {
 
     const childrenToRender = React.Children.map(children, child => {
       if (!React.isValidElement(child)) {
-        console.warn(`react-swipeable-view-native: one of the children provided is invalid: ${child}. We are expecting a valid React Element.`)
+        console.warn(
+          `react-swipeable-view-native: one of the children provided is invalid: ${child}. We are expecting a valid React Element.`,
+        );
       }
 
       return <View style={slideStyleObj}>{child}</View>;

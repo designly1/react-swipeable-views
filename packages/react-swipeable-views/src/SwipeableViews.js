@@ -299,21 +299,38 @@ class SwipeableViews extends React.Component {
     }
   }
 
-  // eslint-disable-next-line camelcase,react/sort-comp
-  UNSAFE_componentWillReceiveProps(nextProps) {
+  // Replace UNSAFE_componentWillReceiveProps with getDerivedStateFromProps
+  static getDerivedStateFromProps(nextProps, prevState) {
     const { index } = nextProps;
 
-    if (typeof index === 'number' && index !== this.props.index) {
+    if (typeof index === 'number' && index !== prevState.indexLatest) {
       if (process.env.NODE_ENV !== 'production') {
         checkIndexBounds(nextProps);
       }
 
-      this.setIndexCurrent(index);
-      this.setState({
-        // If true, we are going to change the children. We shoudn't animate it.
-        displaySameSlide: getDisplaySameSlide(this.props, nextProps),
+      return {
+        // If true, we are going to change the children. We shouldn't animate it.
+        displaySameSlide: getDisplaySameSlide(
+          { children: prevState.previousChildren || [], ...prevState.previousProps },
+          nextProps,
+        ),
         indexLatest: index,
-      });
+        // Store current props and children to compare later
+        previousProps: nextProps,
+        previousChildren: React.Children.toArray(nextProps.children),
+      };
+    }
+
+    return null;
+  }
+
+  // Add componentDidUpdate to handle side effects after state updates
+  componentDidUpdate(prevProps) {
+    const { index } = this.props;
+
+    // Check if index has changed and update indexCurrent
+    if (typeof index === 'number' && index !== prevProps.index) {
+      this.setIndexCurrent(index);
     }
   }
 
@@ -980,9 +997,7 @@ SwipeableViews.propTypes = {
    */
   slideClassName: PropTypes.string,
   /**
-   * This is the inlined style that will be applied
-   * on the slide component.
-   */
+   * This is the inline
   slideStyle: PropTypes.object,
   /**
    * This is the config used to create CSS transitions.
